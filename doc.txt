@@ -1,0 +1,74 @@
+1 分辨率，宽高 ，像素 都是一个意思。
+
+一个图片所占内存大小与 分辨率和格式有关 ，与本身大小多少K无关。计算公式一般为： width*height * 格式所占字节
+例如：
+100 * 100 * 4 （ARGB_8888）一个像素所占 ： 8 + 8 + 8+ 8 = 32 位 ，32位 / 8 = 4字节
+100 * 100 * 2 (RGB_565)   5+6+5 = 16位 ，16位 / 8 = 2字节
+100 * 100 * 2 (RGB_4444)  4+4+4+4 = 16 位。 2字节
+
+2 图片复用条件：
+        bitmap .inmutable = true
+        要复用的图片小于被复用的图片。
+
+
+Glide 模块分类：
+    LruCache 原理：对内存总大小进行维护，是一个缓存淘汰算法。
+        1：构造一个双链表LinkedHashMap，并在构造时设置accessOrder为true。
+        2：在使用的此map的时候，自动进行排序(每次get/put,会将使用的value放入链表header头部)。
+        3：LruCache会在每次get/put的时候判断数据如果达到了maxSize,则会优先删除tail尾端的数据。
+
+
+    缓存使用策略：
+                  总规则：
+                  在调用into之后，Glide会首先从Active Resources查找当前是否有对应的活跃图片，
+                  没有则查找内存缓存，没有则查找资源类型，没有则查找数据来源.
+
+                  1：
+                  一个图片不可能既存在活动缓存，又存在内存缓存当中。
+                  当从内存缓存中移除图片时，如果是主动移除图片 ，则放入 活动缓存， 如果是被动由LRU淘汰移除，则放入内存复用池中。
+                  当从活动缓存中移除图片时，则将图片放入内存缓存。
+
+                  2:
+                  为什么要从内存缓存中移除图片到活动缓存？
+                  如果不从内存缓存移除图片，随着时间推移，有可能图片已经被移除，并且recycle掉了。
+                  而这时从活动缓存中 如果拿到(是一个引用)，再使用就会报错，因为已经recycle了。
+
+
+
+    复用池使用：
+            1:复用池也采用LRU 淘汰算法。
+            2:从复用池拿图片要满足图片复用条件。
+            3:从复用池取图片即是从复用池移除图片，复用池移除属于被动移除，要recycle 图片。
+
+    缓存分类：4层
+
+        活动缓存：
+        内存缓存：
+        磁盘缓存：
+        磁盘缓存：
+
+    图片复用池： 作用是复用的图片所占内存。
+
+1、    为什么要两种key : EningeKey,StringKey ？
+        EngineKey:内存缓存用的 key,要图片复用 ，所以需要宽高。
+        StringKey:磁盘缓存用的key, 不需要宽高。
+
+2、    为什么要有 MultiModelLoader ?
+
+       因为一个model 可能映射多个 ModelClass,比如 model为String类型 时， 可能为 http://xxxx、 file://xxx。
+       model类型 可以映射 多个 modelClass . 这里用 MultiModelLoader保存 多个映射。
+
+       class MultiModelLoader{
+            List<ModelLoader<Model, Data>>
+       }
+
+
+3、    为什么一个 model 要对应多个ModelLoader？
+
+        一个 ModelClass 对应一个 DataClass ，这里成为一个映射。
+        一个映射对应一个ModelLoader.
+        而一个model 对应多个 ModelClass, 所以 model 和ModelClass是一对多关系，
+        所以 model 和 映射 也是一对多关系。 一个model 有多个映射，那就要对应多个 ModelLoader.
+
+
+
